@@ -18,7 +18,7 @@ public class WishlistManager : MonoBehaviour
     public List<GameObject> showButtons = new List<GameObject>();
     public Transform buttonParent;
     public Transform starButtonParent;
-    private GameObject applyButton;
+    private GameObject allHideObjectWhenNoStarTheme;
 
     private string saveFilePath;
 
@@ -46,14 +46,14 @@ public class WishlistManager : MonoBehaviour
     }
     private void Start()
     {
-        LoadStarredThemes(); 
+        LoadStarredThemes();
     }
 
     public void SetApplyButton(GameObject button)
     {
-        applyButton = button;
-        Debug.Log(applyButton.name);
-        applyButton.SetActive(false);
+        allHideObjectWhenNoStarTheme = button;
+        Debug.Log("SetApplyButton: " + (allHideObjectWhenNoStarTheme != null ? allHideObjectWhenNoStarTheme.name : "NULL"));
+        allHideObjectWhenNoStarTheme.SetActive(false);
     }
 
     public void SetupStarButton(Button mainButton, bool isStarred)
@@ -132,7 +132,7 @@ public class WishlistManager : MonoBehaviour
             {
                 starButtons.Remove(starButton);
                 Destroy(starButton);
-                Debug.Log("Removed star button: " + parentButton.name);
+                //Debug.Log("Removed star button: " + parentButton.name);
             }
             // เปลี่ยนไอคอนดาวของปุ่มหลักให้เป็น off
             UpdateStarIcon(parentButton, starOff);
@@ -193,12 +193,13 @@ public class WishlistManager : MonoBehaviour
     }
 
     void UpdateApplyButtonInStarPanel() {
+        //Debug.Log("number" + starButtons.Count);
         if (starButtons.Count == 0) { 
-            applyButton.gameObject.SetActive(false);
+            allHideObjectWhenNoStarTheme.gameObject.SetActive(false);
         }
         else
         {
-            applyButton.gameObject.SetActive(true);
+            allHideObjectWhenNoStarTheme.gameObject.SetActive(true);
         }
     }
 
@@ -224,26 +225,40 @@ public class WishlistManager : MonoBehaviour
             StarredThemesData data = JsonUtility.FromJson<StarredThemesData>(json);
 
             Debug.Log("โหลดข้อมูลจาก JSON: " + json);
+            // ตรวจสอบว่าข้อมูล JSON มีธีมที่ติดดาวหรือไม่
+            if (data == null || data.starredThemeNames == null || data.starredThemeNames.Count == 0)
+            {
+                Debug.LogWarning("ไม่มีธีมที่ติดดาวใน JSON");
+                return;
+            }
+            Debug.Log("จำนวนธีมที่ติดดาว: " + data.starredThemeNames.Count);
 
             foreach (string themeName in data.starredThemeNames)
             {
-                GameObject button = FindButtonByName(themeName);
+                GameObject originalButton = FindButtonByName(themeName);
 
-                if (button != null)
+                if (originalButton != null)
                 {
-                    //Debug.Log("พบปุ่ม: " + themeName);
+                    // สร้างปุ่มใหม่ใน starButtonParent
+                    GameObject newStarButton = Instantiate(originalButton, starButtonParent);
+                    newStarButton.name = originalButton.name;
+                    starButtons.Add(newStarButton);
 
-                    if (!starButtons.Contains(button))
+                    // อัปเดตปุ่มดาว
+                    Button newButtonComponent = newStarButton.GetComponent<Button>();
+                    if (newButtonComponent != null)
                     {
-                        starButtons.Add(button);
+                        SetupStarButton(newButtonComponent, true);
                     }
 
-                    SetupStarButton(button.GetComponent<Button>(), true);
+                    newStarButton.SetActive(true);
+                    UpdateStarIcon(originalButton, starOn);
                 }
-                
+
             }
 
             Debug.Log("โหลดธีมที่ติดดาวเสร็จสิ้น");
+            UpdateApplyButtonInStarPanel();
         }
         
     }

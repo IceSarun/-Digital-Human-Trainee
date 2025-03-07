@@ -5,7 +5,6 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
-using System.Security.AccessControl;
 
 [System.Serializable]
 public class TextureData
@@ -133,7 +132,6 @@ public class FileTextureAdvance : MonoBehaviour
     {
         TextureDataList dataList = new TextureDataList();
 
-        //วนลูปทุกวัตถุแล้วบันทึก
         foreach (GameObject obj in allObjects)
         {
             MeshRenderer renderer = obj.GetComponent<MeshRenderer>();
@@ -141,16 +139,32 @@ public class FileTextureAdvance : MonoBehaviour
 
             if (renderer != null && renderer.material.mainTexture != null)
             {
-                if (obj == objectForTest)
+                if (obj == objectForTest && !string.IsNullOrEmpty(path))
                 {
                     texturePaths = path;
                 }
                 else
                 {
-                    //ถ้าเป็นวัตถุอื่น ให้ใช้พาธปัจจุบันของ Texture (เฉพาะใน Editor)
-                    #if UNITY_EDITOR
-                    texturePaths = AssetDatabase.GetAssetPath(renderer.material.mainTexture);
-                    #endif
+#if UNITY_EDITOR
+                    string editorPath = AssetDatabase.GetAssetPath(renderer.material.mainTexture);
+                    if (!string.IsNullOrEmpty(editorPath))
+                    {
+                        texturePaths = editorPath;
+                    }
+#endif
+                }
+            }
+
+            // แก้ไข: ถ้า texturePaths เป็นค่าว่าง ให้เก็บค่าเดิมที่บันทึกไว้ก่อนหน้า
+            if (string.IsNullOrEmpty(texturePaths) && File.Exists(saveFilePath))
+            {
+                string json = File.ReadAllText(saveFilePath);
+                TextureDataList previousData = JsonUtility.FromJson<TextureDataList>(json);
+                TextureData existingData = previousData.textureDataList.Find(x => x.objectName == obj.name);
+
+                if (existingData != null)
+                {
+                    texturePaths = existingData.texturePath; // ใช้ค่าที่เคยบันทึกไว้
                 }
             }
 
@@ -158,15 +172,14 @@ public class FileTextureAdvance : MonoBehaviour
             {
                 objectName = obj.name,
                 texturePath = texturePaths
-
             });
-            Debug.Log(obj.name + texturePaths);
+
+            Debug.Log($"Saving: {obj.name} -> {texturePaths}");
         }
+        string newJson = JsonUtility.ToJson(dataList, true);
+        File.WriteAllText(saveFilePath, newJson);
 
-        string json = JsonUtility.ToJson(dataList, true);
-        File.WriteAllText(saveFilePath, json);
-
-        Debug.Log("All texture data saved!");
+        Debug.Log($"Saved JSON: {newJson}");
     }
 
     // โหลดข้อมูลให้ทุกวัตถุ
@@ -175,18 +188,23 @@ public class FileTextureAdvance : MonoBehaviour
         if (File.Exists(saveFilePath))
         {
             string json = File.ReadAllText(saveFilePath);
+            Debug.Log($"Loaded JSON: {json}");
             TextureDataList dataList = JsonUtility.FromJson<TextureDataList>(json);
 
             foreach (TextureData data in dataList.textureDataList)
             {
+                //Debug.Log("1");
                 GameObject obj = GameObject.Find(data.objectName);
                 if (obj != null)
                 {
+                    //Debug.Log("2");
                     MeshRenderer renderer = obj.GetComponent<MeshRenderer>();
                     if (renderer != null)
                     {
+                        //Debug.Log("3");
                         if (!string.IsNullOrEmpty(data.texturePath))
                         {
+                            //Debug.Log(renderer.name + " " + data.texturePath);
                             StartCoroutine(ApplySavedTexture(renderer, data.texturePath));
                         }
                         else
@@ -205,14 +223,28 @@ public class FileTextureAdvance : MonoBehaviour
 
     private IEnumerator ApplySavedTexture(MeshRenderer renderer, string texturePath)
     {
-        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture("file:///" + texturePath))
+        string fullPath = "file:///" + texturePath;
+        Debug.Log("0");
+        Debug.Log($"Loading texture for {renderer.gameObject.name} from {fullPath}");
+
+        using (UnityWebRequest request = UnityWebRequestTexture.GetTexture(fullPath))
         {
+            Debug.Log("Before yield return request.SendWebRequest()");
+            // wait for second แปปนึง
+            StartCoroutine(WaitForLoadTexture());
             yield return request.SendWebRequest();
+            Debug.Log("After yield return request.SendWebRequest()");
 
             if (request.result == UnityWebRequest.Result.Success)
             {
+                Debug.Log("1");
                 Texture2D texture = DownloadHandlerTexture.GetContent(request);
-                renderer.material.mainTexture = texture;
+                if (texture != null)
+                {
+                    Debug.Log("2");
+                    renderer.material.mainTexture = texture;
+                    Debug.Log($"Applied texture to {renderer.gameObject.name} from {texturePath}");
+                }
                 Debug.Log($"Loaded texture for {renderer.gameObject.name} from {texturePath}");
             }
             else
@@ -220,5 +252,41 @@ public class FileTextureAdvance : MonoBehaviour
                 Debug.LogError("Error loading saved texture: " + request.error);
             }
         }
+    }
+
+    public void PickTextureFromPreset(GameObject button)
+    {
+        if (button != null)
+        {
+            // ดึง Image Component ของปุ่มที่ถูกกด
+            Image buttonImage = button.GetComponent<Image>();
+            if (buttonImage != null && buttonImage.sprite != null)
+            {
+                // ดึง Texture2D จาก Sprite
+                Texture2D selectedTexture = buttonImage.sprite.texture;
+
+                if (objectForTest != null)
+                {
+                    MeshRenderer objectRenderer = objectForTest.GetComponent<MeshRenderer>();
+                    if (objectRenderer != null)
+                    {
+                        // เปลี่ยน Texture ของวัตถุที่เลือก
+                        objectRenderer.material.mainTexture = selectedTexture;
+
+                        // อัปเดต UI หรือสถานะอื่น ๆ ถ้าจำเป็น
+                        checkDoneButton = true;
+                        SaveTextureData(); // บันทึกการเปลี่ยนแปลง
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("Button does not have a valid Image with a Sprite.");
+            }
+        }
+    }
+
+    IEnumerator WaitForLoadTexture() {
+        yield return new WaitForSeconds(15);
     }
 }

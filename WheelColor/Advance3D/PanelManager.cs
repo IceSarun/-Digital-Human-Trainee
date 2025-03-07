@@ -1,8 +1,6 @@
-using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
-using UnityEngine.EventSystems; // ใช้สำหรับตรวจสอบการคลิก UI
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 public class PanelManager : MonoBehaviour
@@ -11,135 +9,114 @@ public class PanelManager : MonoBehaviour
     public GameObject panelTexture;
     public ColorPickAdvance CC;
     public FileTextureAdvance TF;
-
-    //Editor
     public EditorManager editMode;
 
     private MeshRenderer meshRenderer;
     private Transform highLight;
     private Transform selection;
     private RaycastHit hit;
-    private bool isPanelOpen = false; // สถานะของ Panel
+    private bool isPanelOpen = false;
     private bool checkObject = false;
 
-    //Preset Color
-    private Color selectedColor; // เพิ่มตัวแปรสำหรับจดจำค่าสี
-    public Color[] colorPresets = new Color[10]; // เก็บสีได้สูงสุด 10 สี
-    private int presetCount = 0; // จำนวนสีที่บันทึกใน Preset
-    public Image[] colorPresetUI = new Image[10];
+    // Preset Color
+    private Color selectedColor;
+    private Color[] colorPresets = new Color[8];
+    public Image[] colorPresetUI = new Image[8];
+    private int presetCount = 0;
 
-    //Preset Image
-    public Texture[] imageTexture = new Texture[5];
-    private int presetImageCount = 0;
+    // Preset Image
+    private Texture[] imageTexture = new Texture[5];
     public Image[] texturePresetUI = new Image[5];
-
+    private int presetImageCount = 0;
 
     private void Start()
     {
         panelColor.SetActive(false);
         panelTexture.SetActive(false);
-        for (int i = 0; i<texturePresetUI.Length ;i++) {
-            texturePresetUI[i].gameObject.SetActive(false);
-        }
-        for (int i = 0; i < colorPresetUI.Length; i++)
-        {
-            colorPresetUI[i].gameObject.SetActive(false);
-        }
+        HidePresetUI();
+    }
+
+    private void HidePresetUI()
+    {
+        foreach (var ui in texturePresetUI) ui.gameObject.SetActive(false);
+        foreach (var ui in colorPresetUI) ui.gameObject.SetActive(false);
+    }
+
+    public void SetObjectColor(MeshRenderer selectedRenderer)
+    {
+        CC.SetObject(selectedRenderer);
     }
 
     private void Update()
     {
-        if (editMode.checkColor3DModePanel == true) {
-            if (highLight != null)
-            {
-                highLight.gameObject.GetComponent<Outline>().enabled = false;
-                highLight = null;
-            }
+        if (!editMode.checkColor3DModePanel) return;
 
-            if (isPanelOpen) return; // หาก Panel เปิดอยู่ หยุดการทำงานของไฮไลท์
+        ResetHighlight();
+        if (isPanelOpen) return;
 
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-
-            if (!EventSystem.current.IsPointerOverGameObject() && Physics.Raycast(ray, out hit))
-            {
-                highLight = hit.transform;
-                if (highLight.CompareTag("Selectable") && highLight != selection)
-                {
-                    if (highLight.gameObject.GetComponent<Outline>() != null)
-                    {
-                        highLight.gameObject.GetComponent<Outline>().enabled = true;
-                    }
-                    else
-                    {
-                        Outline outline = highLight.gameObject.AddComponent<Outline>();
-                        outline.enabled = true;
-                        highLight.gameObject.GetComponent<Outline>().OutlineColor = Color.red;
-                        highLight.gameObject.GetComponent<Outline>().OutlineWidth = 7.0f;
-                    }
-                }
-                else
-                {
-                    highLight = null;
-                }
-
-                // ตรวจสอบว่าคลิกบน UI หรือไม่
-                if (Input.GetMouseButtonDown(0))
-                {
-                    if (highLight)
-                    {
-                        if (selection != null)
-                        {
-                            selection.gameObject.GetComponent<Outline>().enabled = false;
-                        }
-                        selection = hit.transform;
-                        selection.gameObject.GetComponent<Outline>().enabled = true;
-                        highLight = null;
-                    }
-                    else
-                    {
-                        if (selection)
-                        {
-                            selection.gameObject.GetComponent<Outline>().enabled = false;
-                            selection = null;
-                        }
-                    }
-
-                    GameObject clickedObject = hit.collider.gameObject;
-                    meshRenderer = clickedObject.GetComponent<MeshRenderer>();
-
-                    if (meshRenderer != null && !isPanelOpen)
-                    {
-                        // แสดง Panel และกำหนดสถานะ
-                        panelColor.SetActive(true);
-                        panelTexture.SetActive(true);
-                        isPanelOpen = true;
-
-                        // ตั้งค่า Object
-                        CC.SetObject(meshRenderer);
-                        TF.SetObject(clickedObject);
-                        checkObject = true;
-
-                    }
-                }
-            }
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if (!EventSystem.current.IsPointerOverGameObject() && Physics.Raycast(ray, out hit))
+        {
+            HandleHighlight(hit.transform);
+            if (Input.GetMouseButtonDown(0)) HandleSelection();
         }
-        
     }
 
-    // ฟังก์ชันสำหรับปิด Panel
+    private void ResetHighlight()
+    {
+        if (highLight)
+        {
+            DisableOutline(highLight);
+            highLight = null;
+        }
+    }
+
+    private void HandleHighlight(Transform target)
+    {
+        if (target.CompareTag("Selectable") && target != selection)
+        {
+            EnableOutline(target);
+            highLight = target;
+        }
+    }
+
+    private void HandleSelection()
+    {
+        if (highLight)
+        {
+            if (selection) DisableOutline(selection);
+            selection = highLight;
+            EnableOutline(selection);
+            highLight = null;
+        }
+        else
+        {
+            if (selection) DisableOutline(selection);
+            selection = null;
+        }
+
+        meshRenderer = hit.collider.gameObject.GetComponent<MeshRenderer>();
+        if (meshRenderer != null && !isPanelOpen)
+        {
+            OpenPanels(hit.collider.gameObject);
+        }
+    }
+
+    private void OpenPanels(GameObject selectedObject)
+    {
+        panelColor.SetActive(true);
+        panelTexture.SetActive(true);
+        isPanelOpen = true;
+        checkObject = true;
+
+        CC.SetObject(meshRenderer);
+        TF.SetObject(selectedObject);
+    }
+
     public void ClosePanels()
     {
-        //เปิดปุ่ม reset 
-        // ปิด Panel
-        //Debug.Log(checkObject.ToString());
-        if (checkObject)
-        {
-            SaveColor();
-        }
-        if (TF.getCheckUpload()) {
-
-            SaveTexture();
-        }
+        if (checkObject) SaveColor();
+        if (TF.getCheckUpload()) SaveTexture();
 
         panelColor.SetActive(false);
         panelTexture.SetActive(false);
@@ -147,24 +124,13 @@ public class PanelManager : MonoBehaviour
         checkObject = false;
         TF.ResetCheckDoneButton();
 
-        // ปิดไฮไลท์ของ selection
-        if (selection != null)
-        {
-            selection.gameObject.GetComponent<Outline>().enabled = false;
-            selection = null;
-        }
-
-        // ปิดไฮไลท์ของ highLight
-        if (highLight != null)
-        {
-            highLight.gameObject.GetComponent<Outline>().enabled = false;
-            highLight = null;
-        }
+        ResetHighlight();
+        if (selection) DisableOutline(selection);
+        selection = null;
     }
 
     public void SaveColor()
     {
-        // ตรวจสอบว่า selectedObject มีค่าและมี Renderer component หรือไม่
         if (meshRenderer == null)
         {
             return;
@@ -176,20 +142,16 @@ public class PanelManager : MonoBehaviour
             return;
         }
 
-        // ดึงสีจาก Material ของวัตถุ
         selectedColor = objectRenderer.material.color;
 
-        // ตรวจสอบว่าสีที่เลือกอยู่ในอาร์เรย์แล้วหรือไม่
         for (int i = 0; i < presetCount; i++)
         {
             if (colorPresets[i] == selectedColor)
             {
                 // Debug.Log("Color already exists in presets.");
-                return; // ออกจากฟังก์ชันหากพบสีซ้ำ
+                return; 
             }
         }
-
-        // ถ้าจำนวนสีเกินขนาดของอาร์เรย์ ให้เลื่อนค่าทั้งหมดไปทางซ้าย
         if (presetCount >= colorPresets.Length)
         {
             for (int i = 1; i < colorPresets.Length; i++)
@@ -197,12 +159,10 @@ public class PanelManager : MonoBehaviour
                 colorPresets[i - 1] = colorPresets[i];
             }
 
-            // เพิ่มสีใหม่ในตำแหน่งสุดท้ายของอาร์เรย์
             colorPresets[colorPresets.Length - 1] = selectedColor;
         }
         else
         {
-            // ถ้ายังไม่เกินขนาดของอาร์เรย์ ให้เพิ่มสีในตำแหน่งถัดไป
             colorPresets[presetCount] = selectedColor;
             presetCount++;
         }
@@ -211,60 +171,40 @@ public class PanelManager : MonoBehaviour
         UpdateColorPresetUI();
     }
 
-    public void UpdateColorPresetUI()
+    private void UpdateColorPresetUI()
     {
         for (int i = 0; i < colorPresetUI.Length; i++)
         {
-            if (i < presetCount)
+            if (i < colorPresets.Length)
             {
-                // แสดงสีที่ถูกบันทึกใน colorPresets
                 colorPresetUI[i].gameObject.SetActive(true);
                 colorPresetUI[i].color = colorPresets[i];
             }
             else
             {
-                // ซ่อน Image หรือรีเซ็ตเป็นสีเริ่มต้น
                 colorPresetUI[i].gameObject.SetActive(false);
-            }
-        }
-
-        // อัปเดตสีของวัตถุ 3D (ถ้ามีการเลือกวัตถุ)
-        if (meshRenderer != null)
-        {
-            Renderer objectRenderer = meshRenderer.GetComponent<Renderer>();
-            if (objectRenderer != null)
-            {
-                objectRenderer.material.color = selectedColor;
             }
         }
     }
 
-    public void SaveTexture() {
-        // ตรวจสอบว่า selectedObject มีค่าและมี Renderer component หรือไม่
-        if (meshRenderer == null)
-        {
-            return;
-        }
+    public void SaveTexture()
+    {
+        if (meshRenderer == null) return;
 
         Renderer objectRenderer = meshRenderer.GetComponent<Renderer>();
         if (objectRenderer == null)
         {
             return;
         }
-
         Texture currentTexture = objectRenderer.material.mainTexture;
-        
-        // ตรวจสอบว่าสีที่เลือกอยู่ในอาร์เรย์แล้วหรือไม่
         for (int i = 0; i < presetCount; i++)
         {
             if (imageTexture[i] != null && imageTexture[i] == currentTexture)
             {
                 // Debug.Log("Color already exists in presets.");
-                return; // ออกจากฟังก์ชันหากพบสีซ้ำ
+                return;
             }
         }
-
-        // ถ้าจำนวน Texture เกินขนาดอาร์เรย์ ให้เลื่อนค่าทั้งหมดไปทางซ้าย
         if (presetImageCount >= imageTexture.Length)
         {
             for (int i = 1; i < imageTexture.Length; i++)
@@ -276,41 +216,87 @@ public class PanelManager : MonoBehaviour
         }
         else
         {
-            imageTexture[presetImageCount]= currentTexture;
+            imageTexture[presetImageCount] = currentTexture;
             presetImageCount++;
         }
 
+
         Debug.Log("Texture saved: " + currentTexture.name);
         UpdateTexturePreset();
-
     }
 
-    public void UpdateTexturePreset()
+    private void UpdateTexturePreset()
     {
         for (int i = 0; i < texturePresetUI.Length; i++)
         {
-            if (i < presetImageCount && imageTexture[i] is Texture2D texture2D)
+            if (i < imageTexture.Length && imageTexture[i] is Texture2D texture2D)
             {
-                // แปลง Texture2D เป็น Sprite
-                Sprite newSprite = Sprite.Create(
+                texturePresetUI[i].gameObject.SetActive(true);
+                texturePresetUI[i].sprite = Sprite.Create(
                     texture2D,
                     new Rect(0, 0, texture2D.width, texture2D.height),
                     new Vector2(0.5f, 0.5f)
                 );
-
-                // แสดง Sprite ใน Image
-                texturePresetUI[i].gameObject.SetActive(true);
-                texturePresetUI[i].sprite = newSprite;
             }
-            
+            else
+            {
+                texturePresetUI[i].gameObject.SetActive(false);
+            }
         }
-
     }
 
+    public void ApplyColorChanges()
+    {
+        CC?.UpdateOutputImage();
+    }
 
     public void DoneButton()
     {
         panelTexture.SetActive(false);
+    }
 
+    private void EnableOutline(Transform obj)
+    {
+        if (!obj.GetComponent<Outline>())
+        {
+            Outline outline = obj.gameObject.AddComponent<Outline>();
+            outline.OutlineColor = Color.red;
+            outline.OutlineWidth = 7.0f;
+        }
+        obj.GetComponent<Outline>().enabled = true;
+    }
+
+    private void DisableOutline(Transform obj)
+    {
+        if (obj.GetComponent<Outline>())
+        {
+            obj.GetComponent<Outline>().enabled = false;
+        }
+    }    
+    public void UpdateUI(Color color)
+    {
+        Color.RGBToHSV(color, out CC.currentHue, out CC.currentSaturation, out CC.currentVal);
+
+        CC.hexInputFeild.text = ColorUtility.ToHtmlStringRGB(color);
+        CC.rInput.text = Mathf.RoundToInt(color.r * 255).ToString();
+        CC.gInput.text = Mathf.RoundToInt(color.g * 255).ToString();
+        CC.bInput.text = Mathf.RoundToInt(color.b * 255).ToString();
+        CC.hueSlider.value = CC.currentHue;
+        SVImageAdvance sviImage = FindObjectOfType<SVImageAdvance>();
+        if (sviImage != null)
+        {
+            RectTransform rectTransform = sviImage.GetComponent<RectTransform>();
+            if (rectTransform != null)
+            {
+                float deltaX = rectTransform.sizeDelta.x * 0.5f;
+                float deltaY = rectTransform.sizeDelta.y * 0.5f;
+
+                float pickerX = (CC.currentSaturation * rectTransform.sizeDelta.x) - deltaX;
+                float pickerY = (CC.currentVal * rectTransform.sizeDelta.y) - deltaY;
+
+                sviImage.UpdatePickerPosition(new Vector2(pickerX, pickerY));
+            }
+        }
+        CC.outputImage.color = color;
     }
 }

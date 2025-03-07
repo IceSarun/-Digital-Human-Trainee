@@ -23,34 +23,36 @@ public class IconColorSaveData
 
 public class ColorPick : MonoBehaviour
 {
-    public float currentHue, currentSaturation, currentVal;
-
+    [Header("UI Elements")]
     [SerializeField]
-    private RawImage hueImage, saturationImage, outputImage;
-    public List<GameObject> allButton = new List<GameObject>();
-    public Transform iconParent;
+    private RawImage hueImage, saturationImage;
 
-    [SerializeField]
-    private Slider hueSlider;
+    public RawImage outputImage;
 
-    [SerializeField]
-    private TMP_InputField hexInputFeild, rInput, gInput, bInput;
+    public Slider hueSlider;
 
-    private Texture2D hueTexture, svTexture, outputTexture;
+    public TMP_InputField hexInputFeild, rInput, gInput, bInput;
 
-    private GameObject selectedButton; // ปุ่มที่เลือกสำหรับ Apply for This
-    public GameObject thisPanel; // ควบคุมการปิด Panel นี้
-    private Color colorWant;
-    public PanelManagerFor2D PM2;
-
-    //จำสี สำหรับ Reset 
-    private Dictionary<GameObject, Color> defaultColors = new Dictionary<GameObject, Color>();
-    public GameObject resetButton;
     [SerializeField]
     private Color colorForResetToDefaults = Color.white;
 
+    [SerializeField]
+    private GameObject resetButton;
+
+
+    [Header("Dependencies")]
+    public PanelManagerFor2D PM2;
     //ตรวจสอบ Theme
     public ThemeIconManager themeDatas;
+    public List<GameObject> allButton = new List<GameObject>();
+    public Transform iconParent;
+    private Color colorWant;
+    private Texture2D hueTexture, svTexture, outputTexture;
+    private GameObject selectedButton; // ปุ่มที่เลือกสำหรับ Apply for This
+    public float currentHue, currentSaturation, currentVal;
+
+    //จำสี สำหรับ Reset 
+    private Dictionary<GameObject, Color> defaultColors = new Dictionary<GameObject, Color>();
 
     private void Awake()
     {
@@ -66,6 +68,7 @@ public class ColorPick : MonoBehaviour
         CreateOutputImage();
         UpdateOutputImage();
     }
+
     private void SetAllButton()
     {
         resetButton.SetActive(false);
@@ -127,7 +130,6 @@ public class ColorPick : MonoBehaviour
         outputTexture = new Texture2D(1, 16);
         outputTexture.wrapMode = TextureWrapMode.Clamp;
         outputTexture.name = "OutputTexture";
-
         UpdateOutputImage();
     }
 
@@ -144,10 +146,7 @@ public class ColorPick : MonoBehaviour
         outputImage.texture = outputTexture;
 
         // Update Hex and RGB inputs
-        hexInputFeild.text = ColorUtility.ToHtmlStringRGB(currentColour);
-        rInput.text = Mathf.RoundToInt(currentColour.r * 255).ToString();
-        gInput.text = Mathf.RoundToInt(currentColour.g * 255).ToString();
-        bInput.text = Mathf.RoundToInt(currentColour.b * 255).ToString();
+        PM2.UpdateUI(currentColour);
         colorWant = currentColour;
     }
 
@@ -171,16 +170,23 @@ public class ColorPick : MonoBehaviour
     public void SetColorFromObject()
     {
         Image uiImage = selectedButton.GetComponent<Image>();
-        Color currentColour = uiImage.color;
+        if (uiImage != null)
+        {
+            Color currentColour = uiImage.color;
 
-        resetButton.SetActive(currentColour != colorForResetToDefaults);
-        UpdateUI(currentColour);
+            resetButton.SetActive(currentColour != colorForResetToDefaults);
+            PM2.UpdateUI(currentColour);
+        }
     }
-
 
     public void UpdateSVIImage()
     {
         currentHue = hueSlider.value;
+        if (svTexture == null)
+        {
+            CreateSVImage();
+        }
+        
         for (int y = 0; y < svTexture.height; y++)
         {
             for (int x = 0; x < svTexture.width; x++)
@@ -200,10 +206,8 @@ public class ColorPick : MonoBehaviour
 
         if (ColorUtility.TryParseHtmlString("#" + hexInputFeild.text, out newCol))
         {
-
             hexInputFeild.text = "";
-            UpdateUI(newCol);
-            //UpdateOutputImage();
+            PM2.UpdateUI(newCol);
         }
     }
 
@@ -221,8 +225,7 @@ public class ColorPick : MonoBehaviour
 
             // สร้างสีจากค่า R, G, B
             Color newCol = new Color(r / 255f, g / 255f, b / 255f);
-            UpdateUI(newCol);
-            //UpdateOutputImage();
+            PM2.UpdateUI(newCol);
         }
 
     }
@@ -249,7 +252,7 @@ public class ColorPick : MonoBehaviour
             }
         }
 
-        thisPanel.SetActive(false);
+        //thisPanel.SetActive(false);
         PM2.ClosePanels();
     }
 
@@ -267,18 +270,11 @@ public class ColorPick : MonoBehaviour
                 }
             }
         }
-        if (colorWant != Color.white)
-        {
-            resetButton.SetActive(true);
-        }
-        else
-        {
-            resetButton.SetActive(false);
-        }
+        resetButton.SetActive(colorWant != colorForResetToDefaults);
         SaveColorsToJson(); // บันทึกสีทั้งหมดที่เปลี่ยนแปลง
         themeDatas.saveColorInThemeApplyAll(colorWant);
         //Debug.Log("Applied color to all buttons.");
-        thisPanel.SetActive(false);
+        //thisPanel.SetActive(false);
         PM2.ClosePanels();
     }
 
@@ -300,7 +296,7 @@ public class ColorPick : MonoBehaviour
                     if (uiImage != null)
                     {
                         uiImage.color = preset;
-                        UpdateUI(preset);
+                        PM2.UpdateUI(preset);
                         //outputImage.color = preset;
 
                     }
@@ -312,56 +308,17 @@ public class ColorPick : MonoBehaviour
 
     public void ResetColor()
     {
-        /*foreach (GameObject button in allButton)
-        {
-            if (button != null && defaultColors.ContainsKey(button))
-            {
-                Image buttonImage = button.GetComponent<Image>();
-                if (buttonImage != null)
-                {
-                    buttonImage.color = defaultColors[button]; // รีเซ็ตสีให้เป็นค่าเริ่มต้น
-                }
-            }
-        }
-        resetButton.SetActive(false);
-        LoadColorsFromJson(); //โหลดสีที่เคยบันทึกไว้แทนการใช้ defaultColors*/
-
         Color currentColour = colorForResetToDefaults;
         Image buttonImage = selectedButton.GetComponent<Image>();
         if (buttonImage != null)
         {
             buttonImage.color = currentColour; // รีเซ็ตสีให้เป็นค่าเริ่มต้น
-        }
-        UpdateUI(currentColour);
-        
-       
-    }
-
-    public void SaveColorsToJson()
-    {
-        IconColorSaveData saveData = new IconColorSaveData();
-
-        foreach (GameObject button in allButton)
-        {
-            if (button != null)
-            {
-                Image buttonImage = button.GetComponent<Image>();
-                if (buttonImage != null)
-                {
-                    IconColorData colorData = new IconColorData
-                    {
-                        iconName = button.name,
-                        colorHex = ColorUtility.ToHtmlStringRGB(buttonImage.color)
-                    };
-                    saveData.iconColors.Add(colorData);
-                }
-            }
+            PM2.UpdateUI(currentColour);
         }
 
-        string json = JsonUtility.ToJson(saveData, true);
-        File.WriteAllText(Application.persistentDataPath + "/iconColors.json", json);
-        //Debug.Log("Saved icon colors to JSON.");
     }
+
+
 
     public void LoadColorsFromJson()
     {
@@ -391,31 +348,29 @@ public class ColorPick : MonoBehaviour
         }
         
     }
-
-    private void UpdateUI(Color color)
+    public void SaveColorsToJson()
     {
-        Color.RGBToHSV(color, out currentHue, out currentSaturation, out currentVal);
-        hueSlider.value = currentHue;
+        IconColorSaveData saveData = new IconColorSaveData();
 
-        hexInputFeild.text = ColorUtility.ToHtmlStringRGB(color);
-        rInput.text = Mathf.RoundToInt(color.r * 255).ToString();
-        gInput.text = Mathf.RoundToInt(color.g * 255).ToString();
-        bInput.text = Mathf.RoundToInt(color.b * 255).ToString();
-
-        SVImage sviImage = FindObjectOfType<SVImage>();
-        if (sviImage != null)
+        foreach (GameObject button in allButton)
         {
-            RectTransform rectTransform = sviImage.GetComponent<RectTransform>();
-            if (rectTransform != null)
+            if (button != null)
             {
-                float deltaX = rectTransform.sizeDelta.x * 0.5f;
-                float deltaY = rectTransform.sizeDelta.y * 0.5f;
-                float pickerX = (currentSaturation * rectTransform.sizeDelta.x) - deltaX;
-                float pickerY = (currentVal * rectTransform.sizeDelta.y) - deltaY;
-                sviImage.UpdatePickerPosition(new Vector2(pickerX, pickerY));
+                Image buttonImage = button.GetComponent<Image>();
+                if (buttonImage != null)
+                {
+                    IconColorData colorData = new IconColorData
+                    {
+                        iconName = button.name,
+                        colorHex = ColorUtility.ToHtmlStringRGB(buttonImage.color)
+                    };
+                    saveData.iconColors.Add(colorData);
+                }
             }
         }
-        outputImage.color = color;
-    }
 
+        string json = JsonUtility.ToJson(saveData, true);
+        File.WriteAllText(Application.persistentDataPath + "/iconColors.json", json);
+        //Debug.Log("Saved icon colors to JSON.");
+    }
 }

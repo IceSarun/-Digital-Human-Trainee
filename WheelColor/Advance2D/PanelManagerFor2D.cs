@@ -7,62 +7,51 @@ using UnityEngine.UI;
 
 public class PanelManagerFor2D : MonoBehaviour
 {
+    [Header("UI Elements")]
     //Find button in scene 
-    public List<GameObject> uiObject = new List<GameObject>();
+    public GameObject panelColor;
     public Transform iconParent;
 
+    [Header("Dependencies")]
     //Edit
-    public EditorManager editerMode;
-
-    public GameObject panelColor;
-    //public ColorPickButtonAdvance CU;
+    public EditorManager editorMode;
     public ColorPick CP;
+
+    public List<GameObject> uiObject = new List<GameObject>();
     private bool isPanelOpen = false; // สถานะของ Panel
     private bool checkObject = false; // ตรวจสอบวัตถุที่กด
     private GameObject selectedObject;
-    //private bool checkSettingButton = false; // ตรวจสอบวัตุที่กดว่าใช่ setting ไหม
-    
+
+    [Header("Color Presets")]
     //Preset Color
-    private Color selectedColor; // เพิ่มตัวแปรสำหรับจดจำค่าสี
-    public Color[] colorPresets = new Color[10]; // เก็บสีได้สูงสุด 10 สี
+    //private Color selectedColor; // เพิ่มตัวแปรสำหรับจดจำค่าสี
+    public Color[] colorPresets = new Color[10]; 
     private int presetCount = 0; // จำนวนสีที่บันทึกใน Preset
     public Image[] colorPresetUI = new Image[10];
-
 
     private void Start()
     {
         panelColor.SetActive(false);
-        for (int i = 0; i< colorPresetUI.Length ;i++) {
-            colorPresetUI[i].gameObject.SetActive(false);
-        }
-
-        if (iconParent != null)
-        {
-            // ดึง Transform ของลูกทั้งหมดใน iconParent
-            Transform[] allChildren = iconParent.GetComponentsInChildren<Transform>(true);
-            foreach (var child in allChildren)
-            {
-                // ตรวจสอบว่า GameObject นั้นมีแท็ก "SelectedIcon" หรือไม่
-                if (child.gameObject.CompareTag("SelectedIcon"))
-                {
-                    uiObject.Add(child.gameObject);
-                }
-            }
-        }
+        InitializePresetUI();
+        LoadAllIcons();
+        
     }
     void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        HandleMouseClick();
+        
+    }
+    private void HandleMouseClick()
+    {
+        if (Input.GetMouseButtonDown(0) && EventSystem.current.IsPointerOverGameObject() && !isPanelOpen && editorMode.checkColorModePanel)
         {
-            if (EventSystem.current.IsPointerOverGameObject() && !isPanelOpen && editerMode.checkColorModePanel)
-            {
-                selectedObject = EventSystem.current.currentSelectedGameObject;
+            selectedObject = EventSystem.current.currentSelectedGameObject;
 
-                if (selectedObject != null)
-                {
-                    HandleGameObjectClick(selectedObject);
-                }
+            if (selectedObject != null)
+            {
+                HandleGameObjectClick(selectedObject);
             }
+
         }
     }
 
@@ -88,22 +77,38 @@ public class PanelManagerFor2D : MonoBehaviour
         }
 
         // ตรวจสอบว่ามี Image หรือ SpriteRenderer เพื่อเปลี่ยนสีหรือเปิด panel
-        Image image = clickedObject.GetComponent<Image>();
-        SpriteRenderer spriteRenderer = clickedObject.GetComponent<SpriteRenderer>();
-
-        if (image != null || spriteRenderer != null)
+        if (clickedObject.GetComponent<Image>() || clickedObject.GetComponent<SpriteRenderer>())
         {
             isPanelOpen = true;
             panelColor.SetActive(true);
             CP.SetUIElement(clickedObject);
             Debug.Log($"Panel opened for {clickedObject.name}");
         }
-        else
+        
+    }
+
+    private void LoadAllIcons()
+    {
+        if (iconParent != null)
         {
-            Debug.Log($"{clickedObject.name} does not support panel interaction.");
+            Transform[] allChildren = iconParent.GetComponentsInChildren<Transform>(true);
+            foreach (Transform child in iconParent)
+            {
+                if (child.gameObject.CompareTag("SelectedIcon"))
+                {
+                    uiObject.Add(child.gameObject);
+                }
+            }
         }
     }
 
+    private void InitializePresetUI()
+    {
+        foreach (var preset in colorPresetUI)
+        {
+            preset.gameObject.SetActive(false);
+        }
+    }
 
     public void SaveColor()
     {
@@ -119,7 +124,7 @@ public class PanelManagerFor2D : MonoBehaviour
             return;
         }
 
-        selectedColor = uiImage.color;
+        Color selectedColor = uiImage.color;
 
         // ตรวจสอบว่าสีที่เลือกอยู่ในอาร์เรย์แล้วหรือไม่
         for (int i = 0; i < presetCount; i++)
@@ -127,11 +132,10 @@ public class PanelManagerFor2D : MonoBehaviour
             if (colorPresets[i] == selectedColor)
             {
                 //Debug.Log("Color already exists in presets.");
-                return; // ออกจากฟังก์ชันหากพบสีซ้ำ
+                return; 
             }
         }
 
-        // ถ้าจำนวนสีเกินขนาดของอาร์เรย์ ให้เลื่อนค่าทั้งหมดไปทางซ้าย
         if (presetCount >= colorPresets.Length)
         {
             for (int i = 1; i < colorPresets.Length; i++)
@@ -139,12 +143,10 @@ public class PanelManagerFor2D : MonoBehaviour
                 colorPresets[i - 1] = colorPresets[i];
             }
 
-            // เพิ่มสีใหม่ในตำแหน่งสุดท้ายของอาร์เรย์
             colorPresets[colorPresets.Length - 1] = selectedColor;
         }
         else
         {
-            // ถ้ายังไม่เกินขนาดของอาร์เรย์ ให้เพิ่มสีในตำแหน่งถัดไป
             colorPresets[presetCount] = selectedColor;
             presetCount++;
         }
@@ -157,7 +159,7 @@ public class PanelManagerFor2D : MonoBehaviour
     {
         for (int i = 0; i < colorPresetUI.Length; i++)
         {
-            if (i < presetCount)
+            if (i < colorPresets.Length)
             {
                 // แสดงสีที่ถูกบันทึกใน colorPresets
                 colorPresetUI[i].gameObject.SetActive(true);
@@ -177,12 +179,11 @@ public class PanelManagerFor2D : MonoBehaviour
     {
         foreach (var buttonObject in uiObject)
         {
-            if (buttonObject == clickedObject)
+            if (buttonObject != clickedObject)
             {
-                continue; // ข้ามตัวที่ถูกกด
+                buttonObject.gameObject.SetActive(false);
+                //continue; // ข้ามตัวที่ถูกกด
             }
-
-            buttonObject.gameObject.SetActive(false);
 
         }
     }
@@ -210,5 +211,32 @@ public class PanelManagerFor2D : MonoBehaviour
 
         // เปิดการโต้ตอบของ GameObject ทั้งหมด
         EnableSelectedIconButtons();
+    }
+
+    public void UpdateUI(Color color)
+    {
+        Color.RGBToHSV(color, out CP.currentHue, out CP.currentSaturation, out CP.currentVal);
+        CP.hueSlider.value = CP.currentHue;
+
+        CP.hexInputFeild.text = ColorUtility.ToHtmlStringRGB(color);
+        CP.rInput.text = Mathf.RoundToInt(color.r * 255).ToString();
+        CP.gInput.text = Mathf.RoundToInt(color.g * 255).ToString();
+        CP.bInput.text = Mathf.RoundToInt(color.b * 255).ToString();
+
+        SVImage sviImage = FindObjectOfType<SVImage>();
+        if (sviImage != null)
+        {
+            RectTransform rectTransform = sviImage.GetComponent<RectTransform>();
+            if (rectTransform != null)
+            {
+                float deltaX = rectTransform.sizeDelta.x * 0.5f;
+                float deltaY = rectTransform.sizeDelta.y * 0.5f;
+                float pickerX = (CP.currentSaturation * rectTransform.sizeDelta.x) - deltaX;
+                float pickerY = (CP.currentVal * rectTransform.sizeDelta.y) - deltaY;
+                sviImage.UpdatePickerPosition(new Vector2(pickerX, pickerY));
+            }
+        }
+        CP.outputImage.color = color;
+
     }
 }

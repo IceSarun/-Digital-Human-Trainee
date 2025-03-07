@@ -65,7 +65,7 @@ public class ThemeIconManager : MonoBehaviour
     public Money myMoney;
 
     public WishlistManager wishlistManager;
-    public GameObject applyButtonInStarPanel;
+    public GameObject objectInStarPanel;
     // สำหรับเปิดโหมดพรีวิว
     public GameObject InPreveiwMode;
     public EditorManager EM;
@@ -159,7 +159,7 @@ public class ThemeIconManager : MonoBehaviour
         }
 
         //ส่งปุ่ม apply in star panel ไปให้ wishlist manager
-        wishlistManager.SetApplyButton(applyButtonInStarPanel) ;
+        wishlistManager.SetApplyButton(objectInStarPanel) ;
     }
 
     public void SetDefault()
@@ -251,7 +251,6 @@ public class ThemeIconManager : MonoBehaviour
             PlayerPrefs.Save();
             ApplyThemeToUI();
         }
-
         
     }
 

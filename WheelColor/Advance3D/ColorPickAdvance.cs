@@ -4,7 +4,6 @@ using UnityEngine.UI;
 using TMPro;
 using UnityEditor;
 using System.IO;
-//using UnityEngine.UIElements;
 
 [System.Serializable]
 public class ObjectColorData
@@ -22,41 +21,42 @@ public class ObjectColorSaveData
 
 public class ColorPickAdvance : MonoBehaviour
 {
-    public float currentHue, currentSaturation, currentVal;
+    
 
     [SerializeField]
-    private RawImage hueImage, saturationImage, outputImage;
+    private RawImage hueImage, saturationImage;
 
-    [SerializeField]
-    private Slider hueSlider;
+    public RawImage outputImage;
 
-    [SerializeField]
-    private TMP_InputField hexInputFeild, rInput, gInput, bInput;
+    public Slider hueSlider;
+
+    public TMP_InputField hexInputFeild, rInput, gInput, bInput;
 
     private Texture2D hueTexture, svTexture, outputTexture;
 
     [SerializeField]
     MeshRenderer changeThisColor;
 
-    //จำสี สำหรับ Reset 
-    private Dictionary<GameObject, Color> defaultColors = new Dictionary<GameObject, Color>();
-
     public PanelManager PM;
-    public GameObject thisPanel;
+    //public GameObject thisPanel;
     public GameObject resetButton;
+
     [SerializeField]
     private Color colorForResetToDefaults = Color.white;
 
     //ตรวจสอบทุก Object
     public List<GameObject> allObject = new List<GameObject>();
     public Transform objectParent;
+    public float currentHue, currentSaturation, currentVal;
 
+    //จำสี สำหรับ Reset 
+    private Dictionary<GameObject, Color> defaultColors = new Dictionary<GameObject, Color>();
+    
     public void Awake()
     {
         SetAllObject();
         LoadColorsFromJson();
     }
-
 
     private void Start()
     {
@@ -84,51 +84,6 @@ public class ColorPickAdvance : MonoBehaviour
         }
     }
 
-    /*private void SaveDefault()
-    {
-        resetButton.SetActive(false);
-        if (changeThisColor != null)
-        {
-            // เก็บค่าสีเริ่มต้นของวัตถุ
-            Color originalColor = changeThisColor.material.color;
-            if (!defaultColors.ContainsKey(changeThisColor.gameObject))
-            {
-                defaultColors[changeThisColor.gameObject] = originalColor;
-            }
-        }
-    }*/
-
-    public void LoadColorsFromJson()
-    {
-        string path = Application.persistentDataPath + "/objectColors.json";
-
-        if (!File.Exists(path))
-        {
-            Debug.LogWarning("ไม่พบไฟล์ JSON สำหรับโหลดสี");
-            return;
-        }
-
-        string json = File.ReadAllText(path);
-        ObjectColorSaveData loadedData = JsonUtility.FromJson<ObjectColorSaveData>(json);
-        Debug.Log(json);
-        foreach (var colorData in loadedData.objectColors)
-        {
-            foreach (GameObject obj in allObject) // ค้นหาวัตถุที่อยู่ใน allObject
-            {
-                //Debug.Log("name = "+ colorData.objectName + " , name object = "+ obj.name);
-                if (obj != null && obj.name == colorData.objectName)
-                {
-                    MeshRenderer renderer = obj.GetComponent<MeshRenderer>();
-                    if (renderer != null && ColorUtility.TryParseHtmlString("#" + colorData.colorHex, out Color loadedColor))
-                    {
-                        renderer.material.color = loadedColor;
-                        Debug.Log($"โหลดสี {loadedColor} ไปที่ {obj.name}");
-                    }
-                }
-            }
-        }
-    }
-
     private void CreateHueImage()
     {
 
@@ -144,7 +99,6 @@ public class ColorPickAdvance : MonoBehaviour
 
         hueTexture.Apply();
         //currentHue = 0;
-
         hueImage.texture = hueTexture;
 
     }
@@ -178,15 +132,7 @@ public class ColorPickAdvance : MonoBehaviour
         outputTexture = new Texture2D(1, 16);
         outputTexture.wrapMode = TextureWrapMode.Clamp;
         outputTexture.name = "outputTexture";
-
-        Color currentColour = Color.HSVToRGB(currentHue, currentSaturation, currentVal);
-
-        for (int i = 0; i < outputTexture.height; i++)
-        {
-            outputTexture.SetPixel(0, i, currentColour);
-        }
-        outputTexture.Apply();
-        outputImage.texture = outputTexture;
+        UpdateOutputImage();
 
     }
 
@@ -205,16 +151,11 @@ public class ColorPickAdvance : MonoBehaviour
         outputTexture.Apply();
         outputImage.texture = outputTexture;
 
-        //Input Hex
-        hexInputFeild.text = ColorUtility.ToHtmlStringRGB(currentColour);
-        //Input RGB
-        rInput.text = Mathf.RoundToInt(currentColour.r * 255).ToString();
-        gInput.text = Mathf.RoundToInt(currentColour.g * 255).ToString();
-        bInput.text = Mathf.RoundToInt(currentColour.b * 255).ToString();
-
-        
-        changeThisColor.material.SetColor("_BaseColor", currentColour);
-        changeThisColor.GetComponent<MeshRenderer>().material.color = currentColour;
+        // อัปเดตค่าใน UI ผ่าน PanelManager
+        PM.UpdateUI(currentColour);
+        changeThisColor.material.color = currentColour;
+        //changeThisColor.material.SetColor("_BaseColor", currentColour);
+        //changeThisColor.GetComponent<MeshRenderer>().material.color = currentColour;
 
     }
 
@@ -247,7 +188,7 @@ public class ColorPickAdvance : MonoBehaviour
             currentHue = hueSlider.value;
         }
 
-        UpdateUI(currentColour);
+        PM.UpdateUI(currentColour);
         resetButton.SetActive(currentColour != colorForResetToDefaults);
 
     }
@@ -259,7 +200,7 @@ public class ColorPickAdvance : MonoBehaviour
         if (svTexture == null) { 
             CreateSVImage();
         }
-       
+
         for (int y = 0; y < svTexture.height; y++)
         {
             for (int x = 0; x < svTexture.width; x++)
@@ -280,7 +221,7 @@ public class ColorPickAdvance : MonoBehaviour
         if (ColorUtility.TryParseHtmlString("#" + hexInputFeild.text, out newCol))
         {
             hexInputFeild.text = "";
-            UpdateUI(newCol);
+            PM.UpdateUI(newCol);
         }
     }
 
@@ -298,7 +239,7 @@ public class ColorPickAdvance : MonoBehaviour
 
             // สร้างสีจากค่า R, G, B
             Color newCol = new Color(r / 255f, g / 255f, b / 255f);
-            UpdateUI(newCol);
+            PM.UpdateUI(newCol);
         }
 
     }
@@ -327,7 +268,7 @@ public class ColorPickAdvance : MonoBehaviour
         SaveColorsToJson(); // บันทึกสีทั้งหมดที่เปลี่ยนแปลง
 
         // ปิดพาเนล UI
-        thisPanel.SetActive(false);
+        //thisPanel.SetActive(false);
         PM.ClosePanels();
     }
 
@@ -347,7 +288,7 @@ public class ColorPickAdvance : MonoBehaviour
                 if (changeThisColor != null)
                 {
                     changeThisColor.material.color = preset;
-                    UpdateUI(preset);
+                    PM.UpdateUI(preset);
                 }
             }
         }
@@ -355,17 +296,40 @@ public class ColorPickAdvance : MonoBehaviour
     }
     public void ResetColor()
     {
-        /*Color defaultColor = colorForResetToDefaults;
-        if (changeThisColor != null && defaultColors.ContainsKey(changeThisColor.gameObject))
-        {
-            // ดึงค่าสีเริ่มต้นของวัตถุ
-            //Color defaultColor = defaultColors[changeThisColor.gameObject];
-            changeThisColor.material.color = defaultColor;
-        }*/
         changeThisColor.material.color = colorForResetToDefaults;
-        UpdateUI(colorForResetToDefaults);
+        PM.UpdateUI(colorForResetToDefaults);
     }
 
+    public void LoadColorsFromJson()
+    {
+        string path = Application.persistentDataPath + "/objectColors.json";
+
+        if (!File.Exists(path))
+        {
+            Debug.LogWarning("ไม่พบไฟล์ JSON สำหรับโหลดสี");
+            return;
+        }
+
+        string json = File.ReadAllText(path);
+        ObjectColorSaveData loadedData = JsonUtility.FromJson<ObjectColorSaveData>(json);
+        Debug.Log(json);
+        foreach (var colorData in loadedData.objectColors)
+        {
+            foreach (GameObject obj in allObject) // ค้นหาวัตถุที่อยู่ใน allObject
+            {
+                //Debug.Log("name = "+ colorData.objectName + " , name object = "+ obj.name);
+                if (obj != null && obj.name == colorData.objectName)
+                {
+                    MeshRenderer renderer = obj.GetComponent<MeshRenderer>();
+                    if (renderer != null && ColorUtility.TryParseHtmlString("#" + colorData.colorHex, out Color loadedColor))
+                    {
+                        renderer.material.color = loadedColor;
+                        Debug.Log($"โหลดสี {loadedColor} ไปที่ {obj.name}");
+                    }
+                }
+            }
+        }
+    }
 
     public void SaveColorsToJson()
     {
@@ -395,33 +359,6 @@ public class ColorPickAdvance : MonoBehaviour
         string json = JsonUtility.ToJson(saveData, true);
         //Debug.Log(json);
         File.WriteAllText(Application.persistentDataPath + "/objectColors.json", json);
-    }
-
-    private void UpdateUI(Color color)
-    {
-        Color.RGBToHSV(color, out currentHue, out currentSaturation, out currentVal);
-        hexInputFeild.text = ColorUtility.ToHtmlStringRGB(color);
-        rInput.text = Mathf.RoundToInt(color.r * 255).ToString();
-        gInput.text = Mathf.RoundToInt(color.g * 255).ToString();
-        bInput.text = Mathf.RoundToInt(color.b * 255).ToString();
-        hueSlider.value = currentHue;
-
-        SVImageAdvance sviImage = FindObjectOfType<SVImageAdvance>();
-        if (sviImage != null)
-        {
-            RectTransform rectTransform = sviImage.GetComponent<RectTransform>();
-            if (rectTransform != null)
-            {
-                float deltaX = rectTransform.sizeDelta.x * 0.5f;
-                float deltaY = rectTransform.sizeDelta.y * 0.5f;
-
-                float pickerX = (currentSaturation * rectTransform.sizeDelta.x) - deltaX;
-                float pickerY = (currentVal * rectTransform.sizeDelta.y) - deltaY;
-
-                sviImage.UpdatePickerPosition(new Vector2(pickerX, pickerY));
-            }
-        }
-        outputImage.color = color;
     }
 
 }
