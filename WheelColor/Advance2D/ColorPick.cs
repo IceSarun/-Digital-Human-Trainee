@@ -239,7 +239,7 @@ public class ColorPick : MonoBehaviour
             if (uiImage != null)
             {
                 uiImage.color = colorWant;
-                if (colorWant != Color.white)
+                if (colorWant != colorForResetToDefaults)
                 {
                     resetButton.SetActive(true);
                 }
@@ -289,6 +289,7 @@ public class ColorPick : MonoBehaviour
 
                 Color preset = buttonImage.color;
                 //Debug.Log("Button Color: " + preset);
+                colorWant = preset;
 
                 if (selectedButton != null)
                 {

@@ -1,7 +1,9 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.Networking;
@@ -56,8 +58,10 @@ public class FileTextureAdvance : MonoBehaviour
 
     public void OpenFileBrowser()
     {
+#if UNITY_EDITOR
         path = EditorUtility.OpenFilePanel("Select Image", "", "png,jpg");
         GetImage();
+#endif
     }
 
     public void GetImage()

@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Collections.Generic;
+#if UNITY_EDITOR
 using UnityEditor;
+#endif
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,8 +18,10 @@ public class FileManager : MonoBehaviour
     
 
     public void OpenFileBrowser() {
+#if UNITY_EDITOR
         path = EditorUtility.OpenFilePanel("Overwrite with image", "", "png,jpg");
         GetImage();
+#endif
     }
 
     public void GetImage() {
